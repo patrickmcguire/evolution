@@ -1,0 +1,27 @@
+(ns evolution.core
+  (:gen-class))
+
+(defn pd
+  "Protected division; returns 0 if the denominator is zero."
+  [num denom]
+  (if (zero? denom)
+    0
+    (/ num denom)))
+
+(def function-set
+  '(
+    +
+    -
+    *
+    pd
+    Math/s';in
+    Math/cos
+))
+
+(defn random-function []
+  (rand-nth '(+ - * pd Math/sin Math/cos)))
+
+(defn -main
+  "I don't do a whole lot ... yet."
+  [& args]
+  (println "Hello, World!"))
