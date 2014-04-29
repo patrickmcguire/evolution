@@ -23,6 +23,8 @@
 ;; If you want to evolve a function to fit your own data then you could    
 ;; just paste a vector of pairs into the definition of target-data instead. 
 
+;; need some more multidimensional stuff, this isn't cutting it
+
 (def target-data
   (map #(vector % (+ (* % %) % 1))
        (range -1.0 1.0 0.1)))
@@ -37,13 +39,14 @@
   '(+
     -
     *
-    pd))
+    pd
+    Math/pow))
 
 (defn random-function 
   []
   (rand-nth function-set))
 
-(defn variable-set
+(defn gen-variable-set
   [num-var]
   (def letters (map str (map char (range 97 123))))
   (def alphabet-size (count letters))
@@ -53,19 +56,20 @@
           string-val (Integer/toString n alphabet-size)]
       (let [lookup-letters (seq string-val)]
         (let [indices (map (fn [letter] (Integer/parseInt (str letter) alphabet-size)) lookup-letters)]
-          (clojure.string/join (concat (list prefix) (map (fn [i] (nth letters i)) indices)))))))
+          (symbol (clojure.string/join (concat (list prefix) (map (fn [i] (nth letters i)) indices))))))))
 
    (map (fn [i] (nth-var i)) (range 0 num-var)))
 
 (defn random-terminal
-  []
-  (rand-nth (list 'x (- (rand 10) 5))))
+  [variable-set]
+  (rand-nth (list (rand-nth variable-set) 
+                  (- (rand 10) 5))))
 
 (defn random-code
-  [depth]
+  [depth variable-set]
   (if (or (zero? depth)
           (zero? (rand-int 2)))
-    (random-terminal)
+    (random-terminal variable-set)
     (list (random-function)
           (random-code (dec depth))
           (random-code (dec depth)))))
@@ -85,8 +89,8 @@
 ;; corresponding y values.
 
 (defn error 
-  [individual]
-  (let [value-function (eval (list 'fn '[x] individual))]
+  [individual variable-set]
+  (let [value-function (eval (list 'fn (vec variable-set) individual))]
     (reduce + (map (fn [[x y]] 
                      (Math/abs 
                        (- (value-function x) y)))
@@ -170,31 +174,32 @@
 ;; population.
 
 (defn evolve
-  [popsize]
+  [popsize num-var target-data]
   (println "Starting evolution...")
-  (loop [generation 0
-         population (sort-by-error (repeatedly popsize #(random-code 2)))]
-    (let [best (first population)
-          best-error (error best)]
-      (println "======================")
-      (println "Generation:" generation)
-      (println "Best error:" best-error)
-      (println "Best program:" best)
-      (println "     Median error:" (error (nth population 
-                                                (int (/ popsize 2)))))
-      (println "     Average program size:" 
-               (float (/ (reduce + (map count (map flatten population)))
-                         (count population))))
-      (if (< best-error 0.1) ;; good enough to count as success
-        (println "Success:" best)
-        (recur 
-          (inc generation)
-          (sort-by-error      
+  (let [variable-set (gen-variable-set num-var)]
+    (loop [generation 0
+           population (sort-by-error (repeatedly popsize #(random-code 2 variable-set)))]
+      (let [best (first population)
+            best-error (error best)]
+        (println "======================")
+        (println "Generation:" generation)
+        (println "Best error:" best-error)
+        (println "Best program:" best)
+        (println "     Median error:" (error (nth population 
+                                                  (int (/ popsize 2)))))
+        (println "     Average program size:" 
+                 (float (/ (reduce + (map count (map flatten population)))
+                           (count population))))
+        (if (< best-error 0.1) ;; good enough to count as success
+          (println "Success:" best)
+          (recur 
+           (inc generation)
+           (sort-by-error      
             (concat
-              (repeatedly (* 1/2 popsize) #(mutate (select population 7)))
-              (repeatedly (* 1/4 popsize) #(crossover (select population 7)
-                                                      (select population 7)))
-              (repeatedly (* 1/4 popsize) #(select population 7)))))))))
+             (repeatedly (* 1/2 popsize) #(mutate (select population 7)))
+             (repeatedly (* 1/4 popsize) #(crossover (select population 7)
+                                                     (select population 7)))
+             (repeatedly (* 1/4 popsize) #(select population 7))))))))))
 
 
 (defn -main
